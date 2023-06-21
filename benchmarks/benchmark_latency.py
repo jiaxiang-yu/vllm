@@ -56,6 +56,7 @@ def main(args: argparse.Namespace):
     for _ in tqdm(range(args.num_iters), desc="Profiling iterations"):
         latencies.append(run_to_completion(profile=False))
     print(f'Avg latency: {np.mean(latencies)} seconds')
+    return np.mean(latencies)
 
 
 if __name__ == '__main__':
