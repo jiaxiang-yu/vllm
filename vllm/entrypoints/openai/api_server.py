@@ -290,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--allowed-headers", type=json.loads, default=["*"], help="allowed headers"
     )
+    parser.add_argument('--tensor-parallel-size', '-tp', type=int, default=1)
     parser.add_argument("--served-model-name", type=str, default=None,
                         help="The model name used in the API. If not specified, "
                              "the model name will be the same as the "
