@@ -41,7 +41,7 @@ async def generate(request: Request) -> Response:
             text_outputs = [
                 prompt + output.text for output in request_output.outputs
             ]
-            ret = {"text": text_outputs}
+            ret = {"text": text_outputs, "token_times": request_output.token_times}
             yield (json.dumps(ret) + "\0").encode("utf-8")
 
     if stream:
@@ -59,7 +59,7 @@ async def generate(request: Request) -> Response:
     assert final_output is not None
     prompt = final_output.prompt
     text_outputs = [prompt + output.text for output in final_output.outputs]
-    ret = {"text": text_outputs}
+    ret = {"text": text_outputs, "token_times": request_output.token_times}
     return JSONResponse(ret)
 
 

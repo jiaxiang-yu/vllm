@@ -65,6 +65,7 @@ class RequestOutput:
         prompt_logprobs: Optional[PromptLogprobs],
         outputs: List[CompletionOutput],
         finished: bool,
+        token_times: List
     ) -> None:
         self.request_id = request_id
         self.prompt = prompt
@@ -72,6 +73,7 @@ class RequestOutput:
         self.prompt_logprobs = prompt_logprobs
         self.outputs = outputs
         self.finished = finished
+        self.token_times = token_times
 
     @classmethod
     def from_seq_group(cls, seq_group: SequenceGroup) -> "RequestOutput":
@@ -108,7 +110,7 @@ class RequestOutput:
         prompt_logprobs = seq_group.prompt_logprobs
         finished = seq_group.is_finished()
         return cls(seq_group.request_id, prompt, prompt_token_ids,
-                   prompt_logprobs, outputs, finished)
+                   prompt_logprobs, outputs, finished, seq_group.token_times)
 
     def __repr__(self) -> str:
         return (f"RequestOutput(request_id={self.request_id}, "

@@ -242,6 +242,7 @@ class SequenceGroup:
         self.sampling_params = sampling_params
         self.arrival_time = arrival_time
         self.prompt_logprobs: Optional[PromptLogprobs] = None
+        self.token_times = []
 
     @property
     def prompt(self) -> str:

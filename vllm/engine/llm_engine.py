@@ -17,6 +17,7 @@ from vllm.sequence import (SamplerOutput, Sequence, SequenceGroup,
 from vllm.transformers_utils.tokenizer import (detokenize_incrementally,
                                                get_tokenizer)
 from vllm.utils import Counter
+import torch
 
 if ray:
     from ray.air.util.torch_dist import init_torch_dist_process_group
@@ -558,6 +559,8 @@ class LLMEngine:
         if scheduler_outputs.is_empty():
             return ignored
 
+        torch.cuda.synchronize()
+        start = time.time()
         # Execute the model.
         output = self._run_workers(
             "execute_model",
@@ -566,7 +569,10 @@ class LLMEngine:
             blocks_to_swap_out=scheduler_outputs.blocks_to_swap_out,
             blocks_to_copy=scheduler_outputs.blocks_to_copy,
         )
-
+        torch.cuda.synchronize()
+        step_time = time.time() - start
+        for sq in scheduler_outputs.scheduled_seq_groups:
+            sq.token_times.append((step_time, scheduler_outputs.num_batched_tokens, scheduler_outputs.prompt_run))
         return self._process_model_outputs(output, scheduler_outputs) + ignored
 
     def _log_system_stats(
