@@ -92,7 +92,7 @@ class BenchEngine:
             raise NotImplementedError(f"{backend}")
     
     def bench(self, runs : List[BenchSetting]) -> List[BenchResult]:
-        time.sleep(20)
+        time.sleep(60)
         print("============Start Benchmarking==================")
         return [self.bench_single(run) for run in runs]
     
@@ -154,7 +154,7 @@ def main(vllm_dir, model, tokenizer, backend, dataset, outfile):
     
     for tp in [1]:
         runs = []
-        for req_rate in range(50, 55, 10):
+        for req_rate in range(20, 400, 40):
             req_rate = req_rate / 10.0
             runs.append(BenchSetting(model, tokenizer, device, backend, dataset, req_rate, tp))
         engine = BenchEngine(backend, model, tokenizer, tp, vllm_dir)

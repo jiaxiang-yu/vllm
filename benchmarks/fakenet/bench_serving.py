@@ -202,11 +202,13 @@ def main(args: argparse.Namespace):
     print("Average latency per output token: "
           f"{avg_per_output_token_latency:.2f} s")
     
-    from datetime import datetime
     import pickle
-    formatted_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with open(f"all_token_times_{formatted_now}", 'wb') as f:
-        pickle.dump(all_token_times, f)
+    with open(f"data/stats_{args.request_rate}", 'wb') as f:
+        data = {
+            "request_latency" : REQUEST_LATENCY,
+            "token_times": all_token_times
+        }
+        pickle.dump(data, f)
 
 
 if __name__ == "__main__":
@@ -224,7 +226,7 @@ if __name__ == "__main__":
                         help="Generates `best_of` sequences per prompt and "
                              "returns the best one.")
     parser.add_argument("--use-beam-search", action="store_true")
-    parser.add_argument("--num-prompts", type=int, default=10,
+    parser.add_argument("--num-prompts", type=int, default=500,
                         help="Number of prompts to process.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument('--trust-remote-code', action='store_true',
