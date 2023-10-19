@@ -4,7 +4,9 @@
 ```
 {
     'request_latency': [(prompt_len, gen_len, request latency for that request)], # list of stats for each request
-    'token_times': [(time for that batch, number of tokens in that batch, if that batch is a prompt run)]
+    'token_times': [[(time for that batch, number of tokens in that batch, if that batch is a prompt run)], # information for request 1
+                    [(time for that batch, number of tokens in that batch, if that batch is a prompt run)], # information for request 2
+                    ........]
 }
 ```
 4. bench_results_tp1 contains the high level information for different request rates (e.g., total time to run all the requests).
