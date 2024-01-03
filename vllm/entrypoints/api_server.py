@@ -22,7 +22,12 @@ async def health() -> Response:
     """Health check."""
     return Response(status_code=200)
 
-
+@app.post("/dump")
+async def dump(request: Request) -> None:
+    request_dict = await request.json()
+    filename = request_dict.pop("filename")
+    await engine.dump(filename)
+    
 @app.post("/generate")
 async def generate(request: Request) -> Response:
     """Generate completion for the request.

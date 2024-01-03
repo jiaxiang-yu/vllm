@@ -17,7 +17,7 @@ from cllam.trace import TRACER
 import cllam.trace as CTrace
 
 logger = init_logger(__name__)
-
+rid_tid_map: Dict[str, str] = {}
 
 class AsyncEngineDeadError(RuntimeError):
     pass
@@ -127,7 +127,12 @@ class RequestTracker:
             "request_id": request_id,
             **engine_add_request_kwargs
         }))
-
+        
+        tid = TRACER.add(CTrace.Request)
+        request_trace = TRACER.get(tid)
+        request_trace.start_us = time.perf_counter() * 1e6
+        rid_tid_map[request_id] = tid
+        
         self.new_requests_event.set()
 
         return stream
@@ -144,6 +149,9 @@ class RequestTracker:
             # The request has already finished or been aborted.
             return
 
+        tid = rid_tid_map[request_id]
+        request_trace = TRACER.get(tid)
+        request_trace.end_us = time.perf_counter() * 1e6
         self._request_streams[request_id].finish()
 
     def get_new_and_finished_requests(self) -> Tuple[List[Dict], Set[str]]:
@@ -196,21 +204,21 @@ class _AsyncLLMEngine(LLMEngine):
         """
         step_tid = TRACER.add(CTrace.Step)
         step_trace = TRACER.get(step_tid)
-        step_trace.start = time.perf_counter()
+        step_trace.start_us = time.perf_counter() * 1e6
         
         
         seq_group_metadata_list, scheduler_outputs, ignored = self._schedule()
         if scheduler_outputs.is_empty():
-            step_trace.end = time.perf_counter()
+            step_trace.end_us = time.perf_counter() * 1e6
             return ignored
 
-        step_trace.batch_start = time.perf_counter()
+        step_trace.batch_start_us = time.perf_counter() * 1e6
         step_trace.is_prompt_run = scheduler_outputs.prompt_run
         step_trace.batched_token_num = scheduler_outputs.num_batched_tokens
         step_trace.context_token_num = self.get_context_token_num(scheduler_outputs)
-        step_trace.batched_requests = len(scheduler_outputs.scheduled_seq_groups)
-        step_trace.preempted_requests = [] # TODO
-        step_trace.available_slots = -1 # TODO
+        step_trace.batched_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.scheduled_seq_groups]
+        step_trace.preempted_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.preempted_requests]
+        step_trace.available_slots = self.scheduler.block_manager.gpu_allocator.get_num_free_blocks() * self.cache_config.block_size
         
         # Execute the model.
         output = await self._run_workers_async(
@@ -221,11 +229,12 @@ class _AsyncLLMEngine(LLMEngine):
             blocks_to_copy=scheduler_outputs.blocks_to_copy,
         )
 
-        step_trace.batch_end = time.perf_counter()
-
+        step_trace.batch_end_us = time.perf_counter() * 1e6
+        step_trace.num_blocks_to_swap_in = len(scheduler_outputs.blocks_to_swap_in)
+        step_trace.num_blocks_to_swap_out = len(scheduler_outputs.blocks_to_swap_out)
         output = self._process_model_outputs(output, scheduler_outputs) + ignored
 
-        step_trace.end = time.perf_counter()
+        step_trace.end_us = time.perf_counter() * 1e6
         return output
     
     async def _run_workers_async(
@@ -510,6 +519,12 @@ class AsyncLLMEngine:
             return await self.engine.get_model_config.remote()
         else:
             return self.engine.get_model_config()
+
+    async def dump(self, filename) -> None:
+        request_rate = float(filename.split('_')[1])
+        TRACER.metadata['request_rate'] = request_rate
+        TRACER.export(filename)
+        TRACER.clear()
 
     @classmethod
     def from_engine_args(cls,

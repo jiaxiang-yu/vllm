@@ -36,6 +36,7 @@ class SchedulerOutputs:
         blocks_to_swap_out: Dict[int, int],
         blocks_to_copy: Dict[int, List[int]],
         ignored_seq_groups: List[SequenceGroup],
+        preempted_requests: List[SequenceGroup]
     ) -> None:
         self.scheduled_seq_groups = scheduled_seq_groups
         self.prompt_run = prompt_run
@@ -46,6 +47,7 @@ class SchedulerOutputs:
         # Swap in and swap out should never happen at the same time.
         assert not (blocks_to_swap_in and blocks_to_swap_out)
         self.ignored_seq_groups = ignored_seq_groups
+        self.preempted_requests = preempted_requests
 
     def is_empty(self) -> bool:
         # NOTE: We do not consider the ignored sequence groups.
@@ -202,6 +204,7 @@ class Scheduler:
                     blocks_to_swap_out=blocks_to_swap_out,
                     blocks_to_copy=blocks_to_copy,
                     ignored_seq_groups=ignored_seq_groups,
+                    preempted_requests=[]
                 )
                 return scheduler_outputs
 
@@ -274,6 +277,7 @@ class Scheduler:
             blocks_to_swap_out=blocks_to_swap_out,
             blocks_to_copy=blocks_to_copy,
             ignored_seq_groups=[],
+            preempted_requests=preempted
         )
         return scheduler_outputs
 

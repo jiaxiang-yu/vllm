@@ -1,74 +1,112 @@
 from dataclasses import asdict, dataclass
 import json
 from os import path
-import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Union
+from collections import defaultdict
+
+"""
+One profiling process with same configuration generates one `TraceBundle`.
+Each `TraceBundle` contains all collected `Trace`s with different types.
+You may define your own trace type with a new class that inherits `Trace`.
+This is the only required file for third-party profiling and shouldn't have any cllam dependency.
+e.g.
+    from cllam.analysis.trace import TRACER, Request
+    tid = TRACER.add(trace.Request)
+    trace: Request = TRACER.get(tid)
+    trace.start_us = time.perf_counter() * 1_000_000
+    TRACER.export("my_trace.json")
+    TRACER.clear()
+"""
 
 
 @dataclass
 class Trace:
-    tid: int = None
+    tid: str = None  # <type>:<index>
+    type: str = None
+
+    def __post_init__(self):
+        self.type = self.__class__.__name__
+
+    def asdict(self):
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class TraceBundle:
+    metadata: Dict = None
+    traces: List[Trace] = None
+
+    def __post_init__(self):
+        if self.traces:
+            self.traces = [
+                globals()[trace["type"]](**trace) if isinstance(trace, dict) else trace
+                for trace in self.traces
+            ]
+
+    def asdict(self):
+        return {
+            "metadata": self.metadata,
+            "traces": [trace.asdict() for trace in self.traces],
+        }
 
 
 @dataclass
 class Step(Trace):
-    start: int = None
-    end: int = None
-    batch_start: int = None
-    batch_end: int = None
+    start_us: int = None  # unit:microsec
+    end_us: int = None  # unit:microsec
+    batch_start_us: int = None  # unit:microsec
+    batch_end_us: int = None  # unit:microsec
     is_prompt_run: bool = None
     batched_token_num: int = None
     context_token_num: int = None
-    batched_requests: List[int] = None
-    preempted_requests: List[int] = None
+    batched_requests: List[str] = None  # List of request trace id.
+    preempted_requests: List[str] = None  # List of request trace id.
     available_slots: int = None
+    num_blocks_to_swap_in: int = None
+    num_blocks_to_swap_out: int = None
 
 
 @dataclass
 class Request(Trace):
-    start: int = None
-    end: int = None
+    start_us: int = None  # unit:microsec
+    end_us: int = None  # unit:microsec
     prompt_len: int = None
     gen_len: int = None
 
 
 class Tracer:
-    TRACE_FOLDER = path.join(Path(path.dirname(__file__)), "trace")
+    TRACE_FOLDER = Path(path.dirname(__file__)) / "trace"
 
     def __init__(self):
         self.traces: Dict[str, Trace] = {}
-        if not os.path.exists(self.TRACE_FOLDER):
-            os.makedirs(self.TRACE_FOLDER)
+        self.type_nums: Dict[str, int] = defaultdict(int)
+        self.metadata: Dict = {}
+        if not path.exists(self.TRACE_FOLDER):
+            Path.mkdir(self.TRACE_FOLDER, parents=True)
 
-    def add(self, trace_type: type) -> int:
-        assert issubclass(trace_type, Trace), "Invalid trace type is provided!"
-        tid = len(self.traces)
-        self.traces[tid] = trace_type(tid=tid)
+    def add(self, trace_type: type) -> str:
+        assert issubclass(trace_type, Trace), f"Invalid trace type: {trace_type}"
+        type_name = trace_type.__name__
+        tid = f"{type_name}:{self.type_nums[type_name]}"
+        self.traces[tid] = trace_type(tid)
+        self.type_nums[type_name] += 1
         return tid
 
     def get(self, tid: int) -> Union[Request, Step]:
-        assert tid in self.traces, "Invalid trace id is provided!"
+        assert tid in self.traces, f"Invalid trace id: {tid}"
         return self.traces[tid]
 
     def export(self, filename: str = "trace"):
-        trace_bundle: Dict[str, List[Dict]] = {}
-
-        for trace in self.traces.values():
-            type_name = trace.__class__.__name__
-            if type_name not in trace_bundle:
-                trace_bundle[type_name] = []
-            trace_dict = asdict(
-                trace, dict_factory=lambda d: {k: v for (k, v) in d if v is not None}
-            )
-            trace_bundle[type_name].append(trace_dict)
-
+        bundle = TraceBundle(self.metadata, list(self.traces.values()))
         trace_path = path.join(self.TRACE_FOLDER, f"{filename}.json")
         with open(trace_path, "w") as file:
-            json.dump(trace_bundle, file)
-
-    def clear(self):
+            json.dump(bundle.asdict(), file)
+        print(f"Exported cllam trace file at {trace_path}")
+        
         self.traces.clear()
+        self.metadata.clear()
+        self.type_nums.clear()
 
 
 TRACER = Tracer()

@@ -103,7 +103,7 @@ class BenchEngine:
             raise NotImplementedError(f"{backend}")
 
     def bench(self, runs : List[BenchSetting]) -> List[BenchResult]:
-        time.sleep(120)
+        time.sleep(20)
         print("============Start Benchmarking==================")
         return [self.bench_single(run) for run in runs]
 
@@ -208,6 +208,10 @@ if __name__ == "__main__":
     parser.add_argument("--gen_len", type=int, default=64)
     parser.add_argument("--num_requests", type=int, default=500)
     parser.add_argument("--repeat_num", type=int, default=3)
-    parser.add_argument("--request_rate_params", type=tuple, help="(start_request_rate, end_request_rate, step_size). End_request_size is INCLUDED.", default=(2, 50, 8))
+    
+    def tuple_type(strings):
+        return tuple([int(a) for a in strings.split(',')])
+
+    parser.add_argument("--request_rate_params", type=tuple_type, help="start_request_rate, end_request_rate, step_size. End_request_size is INCLUDED.", default='2,50,8')
     args = parser.parse_args()
     main(args.vllm_dir, args.model, args.tokenizer, args.backend, args.dataset, args.outfile, args.prompt_len, args.gen_len, args.num_requests, args.repeat_num, args.request_rate_params)

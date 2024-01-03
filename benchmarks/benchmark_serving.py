@@ -26,8 +26,6 @@ import aiohttp
 import numpy as np
 from transformers import PreTrainedTokenizerBase
 from vllm.transformers_utils.tokenizer import get_tokenizer
-from cllam.trace import TRACER
-import cllam.trace as Ctrace
 
 # (prompt len, output len, latency)
 REQUEST_LATENCY: List[Tuple[int, int, float]] = []
@@ -96,7 +94,21 @@ async def get_request(
         # The next request will be sent after the interval.
         await asyncio.sleep(interval)
 
-
+async def dump_trace(api_url:str, filename: str):
+    headers = {"User-Agent": "Benchmark Client"}
+    pload = {
+        "filename": filename,
+    }
+    timeout = aiohttp.ClientTimeout(total=100)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(api_url, headers=headers, json=pload) as response:
+            chunks = []
+            async for chunk, _ in response.content.iter_chunks():
+                chunks.append(chunk)
+        output = b"".join(chunks).decode("utf-8")
+        output = json.loads(output)
+    print(output)
+        
 async def send_request(
     backend: str,
     api_url: str,
@@ -107,11 +119,6 @@ async def send_request(
     use_beam_search: bool,
 ) -> None:
     request_start_time = time.perf_counter()
-    tid = TRACER.add(Ctrace.Request)
-    request_trace = TRACER.get(tid)
-    request_trace.start = request_start_time
-    request_trace.prompt_len = prompt_len
-    request_trace.gen_len = output_len
     
     headers = {"User-Agent": "Benchmark Client"}
     if backend == "vllm":
@@ -155,7 +162,6 @@ async def send_request(
                 break
 
     request_end_time = time.perf_counter()
-    request_trace.end = request_end_time
     request_latency = request_end_time - request_start_time
     REQUEST_LATENCY.append((prompt_len, output_len, request_latency))
 
@@ -171,19 +177,18 @@ async def benchmark(
     tasks: List[asyncio.Task] = []
     async for request in get_request(input_requests, request_rate):
         prompt, prompt_len, output_len = request
-        task = asyncio.create_task(send_request(backend, api_url, prompt,
+        task = asyncio.create_task(send_request(backend, f"{api_url}/generate", prompt,
                                                 prompt_len, output_len,
                                                 best_of, use_beam_search))
         tasks.append(task)
     await asyncio.gather(*tasks)
-
 
 def main(args: argparse.Namespace):
     print(args)
     random.seed(args.seed)
     np.random.seed(args.seed)
 
-    api_url = f"http://{args.host}:{args.port}/generate"
+    api_url = f"http://{args.host}:{args.port}"
     tokenizer = get_tokenizer(args.tokenizer, trust_remote_code=args.trust_remote_code)
     input_requests = sample_requests(args.dataset, args.num_prompts, tokenizer, args.prompt_len, args.gen_len)
 
@@ -194,6 +199,7 @@ def main(args: argparse.Namespace):
     benchmark_time = benchmark_end_time - benchmark_start_time
     print(f"Total time: {benchmark_time:.2f} s")
     print(f"Throughput: {args.num_prompts / benchmark_time:.2f} requests/s")
+    asyncio.run(dump_trace(f"{api_url}/dump", f"step_{args.request_rate}_{args.prompt_len}_{args.gen_len}"))
 
     # Compute the latency statistics.
     avg_latency = np.mean([latency for _, _, latency in REQUEST_LATENCY])
@@ -209,8 +215,6 @@ def main(args: argparse.Namespace):
     ])
     print("Average latency per output token: "
           f"{avg_per_output_token_latency:.2f} s")
-    TRACER.export(f"{args.request_rate}_{args.prompt_len}_{args.gen_len}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
