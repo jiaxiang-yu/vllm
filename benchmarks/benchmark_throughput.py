@@ -86,7 +86,7 @@ def run_vllm(
     )
 
     # Add the requests to the engine.
-    for prompt, _, output_len in requests:
+    for prompt, input_len, output_len in requests:
         sampling_params = SamplingParams(
             n=n,
             temperature=0.0 if use_beam_search else 1.0,
@@ -106,6 +106,7 @@ def run_vllm(
     # FIXME(woosuk): Do not use internal method.
     llm._run_engine(use_tqdm=True)
     end = time.perf_counter()
+    llm.llm_engine.dump(f"step_{len(requests)}_{input_len}_{output_len}.json")
     return end - start
 
 

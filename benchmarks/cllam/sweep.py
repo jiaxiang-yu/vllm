@@ -84,7 +84,10 @@ class BenchEngine:
         if backend == "vllm":
             cmd = ("python -m vllm.entrypoints.api_server"
                   f" --model {model} --tensor-parallel-size {tp} "
-                  f" --tokenizer {tokenizer} --disable-log-requests")
+                  f" --tokenizer {tokenizer} --disable-log-requests"
+                  f" --gpu-memory-utilization 0.9"
+                  f" --max-num-batched-tokens 4096"
+                  f" --max-num-seqs 4096")
             self.backend_process = Util.run_cmd(cmd, False)
             self.vllm_dir = vllm_dir
         elif backend == "tgi":
@@ -179,11 +182,11 @@ def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_
     for tp in [1]:
         runs = []
         # warmup
-        runs.append(BenchSetting(model, tokenizer, device, backend, dataset, 50.0, tp, -1, gen_len, prompt_len, num_requests))
+        runs.append(BenchSetting(model, tokenizer, device, backend, dataset, 50.0, tp, -1, gen_len, prompt_len, 100))
         request_rates = []
         for iteration_num in range(repeat_num):
             # All * 10 to generate non-integer request rates
-            for req_rate in range(request_rate_start * 10, (request_rate_end + step) * 10, step * 10):
+            for req_rate in range(int(request_rate_start * 10), int((request_rate_end + step) * 10), int(step * 10)):
                 req_rate = req_rate / 10.0
                 request_rates.append(req_rate)
                 runs.append(BenchSetting(model, tokenizer, device, backend, dataset, req_rate, tp, iteration_num, gen_len, prompt_len, num_requests))
@@ -210,7 +213,7 @@ if __name__ == "__main__":
     parser.add_argument("--repeat_num", type=int, default=3)
     
     def tuple_type(strings):
-        return tuple([int(a) for a in strings.split(',')])
+        return tuple([float(a) for a in strings.split(',')])
 
     parser.add_argument("--request_rate_params", type=tuple_type, help="start_request_rate, end_request_rate, step_size. End_request_size is INCLUDED.", default='2,50,8')
     args = parser.parse_args()

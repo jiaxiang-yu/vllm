@@ -18,8 +18,11 @@ from vllm.sequence import (SamplerOutput, Sequence, SequenceGroup,
 from vllm.transformers_utils.tokenizer import (detokenize_incrementally,
                                                get_tokenizer)
 from vllm.utils import Counter
-# from cllam.trace import TRACER
+from cllam.trace import TRACER
 import cllam.trace as CTrace
+from typing import Dict
+rid_tid_map: Dict[str, str] = {}
+
 import torch
 
 if ray:
@@ -295,6 +298,11 @@ class LLMEngine:
         seq_group = SequenceGroup(request_id, [seq], sampling_params,
                                   arrival_time)
 
+        tid = TRACER.add(CTrace.Request)
+        request_trace = TRACER.get(tid)
+        request_trace.start_us = time.perf_counter() * 1e6
+        rid_tid_map[request_id] = tid
+        
         # Add the sequence group to the scheduler.
         self.scheduler.add_seq_group(seq_group)
 
@@ -576,20 +584,24 @@ class LLMEngine:
         and updates the scheduler with the model outputs. Finally, it decodes
         the sequences and returns the newly generated results.
         """
-        # step_tid = TRACER.add(CTrace.Step)
-        # step_trace = TRACER.get(step_tid)
-        # step_trace.start = time.perf_counter()
+        step_tid = TRACER.add(CTrace.Step)
+        step_trace = TRACER.get(step_tid)
+        step_trace.start_us = time.perf_counter() * 1e6
         
         seq_group_metadata_list, scheduler_outputs, ignored = self._schedule()
         if scheduler_outputs.is_empty():
-            # step_trace.end = time.perf_counter()
+            step_trace.end_us = time.perf_counter() * 1e6
             return ignored
 
-        # torch.cuda.synchronize()
-        # step_trace.batch_start = time.perf_counter()
-        # step_trace.is_prompt_run = scheduler_outputs.prompt_run
-        # step_trace.batched_token_num = scheduler_outputs.num_batched_tokens
-        # step_trace.context_token_num = 0 # TODO
+        torch.cuda.synchronize()
+        step_trace.batch_start_us = time.perf_counter() * 1e6
+        step_trace.is_prompt_run = scheduler_outputs.prompt_run
+        step_trace.batched_token_num = scheduler_outputs.num_batched_tokens
+        step_trace.context_token_num = self.get_context_token_num(scheduler_outputs)
+        step_trace.batched_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.scheduled_seq_groups]
+        step_trace.preempted_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.preempted_requests]
+        step_trace.available_slots = self.scheduler.block_manager.gpu_allocator.get_num_free_blocks() * self.cache_config.block_size
+        
         
         # Execute the model.
         output = self._run_workers(
@@ -599,12 +611,14 @@ class LLMEngine:
             blocks_to_swap_out=scheduler_outputs.blocks_to_swap_out,
             blocks_to_copy=scheduler_outputs.blocks_to_copy,
         )
-        # torch.cuda.synchronize()
-        # step_trace.batch_end = time.perf_counter()
-
+        torch.cuda.synchronize()
+        step_trace.batch_end_us = time.perf_counter() * 1e6
+        step_trace.num_blocks_to_swap_in = len(scheduler_outputs.blocks_to_swap_in)
+        step_trace.num_blocks_to_swap_out = len(scheduler_outputs.blocks_to_swap_out)
+        
         output = self._process_model_outputs(output, scheduler_outputs)
         
-        # step_trace.end = time.perf_counter()
+        step_trace.end_us = time.perf_counter() * 1e6
         return output
     
     def _log_system_stats(
@@ -781,3 +795,15 @@ class LLMEngine:
         for other_output in all_outputs[1:]:
             assert output == other_output
         return output
+    
+    def get_context_token_num(self, scheduler_outputs: SchedulerOutputs) -> int:
+        total_context_len = 0
+        for seq_group in scheduler_outputs.scheduled_seq_groups:
+            for seq in seq_group.get_seqs():
+                total_context_len += seq.get_len()
+        return total_context_len
+
+    def dump(self, filename) -> None:
+        request_rate = float(filename.split('_')[1])
+        TRACER.metadata['request_rate'] = request_rate
+        TRACER.export(filename)

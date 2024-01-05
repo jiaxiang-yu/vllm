@@ -184,14 +184,6 @@ class RequestTracker:
 
 class _AsyncLLMEngine(LLMEngine):
     """Extension of LLMEngine to add async methods."""
-
-    def get_context_token_num(self, scheduler_outputs: SchedulerOutputs) -> int:
-        total_context_len = 0
-        for seq_group in scheduler_outputs.scheduled_seq_groups:
-            for seq in seq_group.get_seqs():
-                total_context_len += seq.get_len()
-        return total_context_len
-    
     async def step_async(self) -> List[RequestOutput]:
         """Performs one decoding iteration and returns newly generated results.
         The workers are ran asynchronously if possible.
@@ -232,10 +224,17 @@ class _AsyncLLMEngine(LLMEngine):
         step_trace.batch_end_us = time.perf_counter() * 1e6
         step_trace.num_blocks_to_swap_in = len(scheduler_outputs.blocks_to_swap_in)
         step_trace.num_blocks_to_swap_out = len(scheduler_outputs.blocks_to_swap_out)
-        output = self._process_model_outputs(output, scheduler_outputs) + ignored
+        outputs = self._process_model_outputs(output, scheduler_outputs) + ignored
 
         step_trace.end_us = time.perf_counter() * 1e6
-        return output
+        
+        for output in outputs:
+            if output.finished:
+                tid = rid_tid_map[output.request_id]
+                request_trace = TRACER.get(tid)
+                request_trace.end_us = time.perf_counter() * 1e6
+        
+        return outputs
     
     async def _run_workers_async(
         self,
@@ -524,7 +523,6 @@ class AsyncLLMEngine:
         request_rate = float(filename.split('_')[1])
         TRACER.metadata['request_rate'] = request_rate
         TRACER.export(filename)
-        TRACER.clear()
 
     @classmethod
     def from_engine_args(cls,
