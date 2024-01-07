@@ -10,7 +10,9 @@ from vllm.sequence import (Sequence, SequenceData, SequenceGroup,
                            SequenceGroupMetadata, SequenceStatus)
 
 logger = init_logger(__name__)
-
+from cllam.trace import TRACER
+import cllam.trace as CTrace
+rid_tid_map: Dict[str, str] = {}
 
 class PreemptionMode(enum.Enum):
     """Preemption modes.
@@ -86,6 +88,11 @@ class Scheduler:
         self.swapped: List[SequenceGroup] = []
 
     def add_seq_group(self, seq_group: SequenceGroup) -> None:
+        tid = TRACER.add(CTrace.Request)
+        request_trace = TRACER.get(tid)
+        request_trace.start_us = time.perf_counter() * 1e6
+        rid_tid_map[seq_group.request_id] = tid
+        
         # Add sequence groups to the waiting queue.
         self.waiting.append(seq_group)
 
@@ -314,10 +321,15 @@ class Scheduler:
         self.block_manager.free(seq)
 
     def free_finished_seq_groups(self) -> None:
-        self.running = [
-            seq_group for seq_group in self.running
-            if not seq_group.is_finished()
-        ]
+        new_running = []
+        for seq_group in self.running:
+            if seq_group.is_finished():
+                tid = rid_tid_map[seq_group.request_id]
+                request_trace = TRACER.get(tid)
+                request_trace.end_us = time.perf_counter() * 1e6
+            else:
+                new_running.append(seq_group)
+        self.running = new_running
 
     def _allocate(self, seq_group: SequenceGroup) -> None:
         self.block_manager.allocate(seq_group)

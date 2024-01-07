@@ -65,6 +65,10 @@ class Step(Trace):
     available_slots: int = None
     num_blocks_to_swap_in: int = None
     num_blocks_to_swap_out: int = None
+    prepare_duration: int = None
+    use_cuda_graph: bool = None
+    execute_model_duration: int = None
+    sample_duration: int = None
 
 
 @dataclass

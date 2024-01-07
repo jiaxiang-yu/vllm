@@ -12,12 +12,11 @@ from vllm.logger import init_logger
 from vllm.outputs import RequestOutput
 from vllm.sampling_params import SamplingParams
 
-from vllm.core.scheduler import SchedulerOutputs
 from cllam.trace import TRACER
 import cllam.trace as CTrace
 
 logger = init_logger(__name__)
-rid_tid_map: Dict[str, str] = {}
+from vllm.core.scheduler import rid_tid_map
 
 class AsyncEngineDeadError(RuntimeError):
     pass
@@ -128,10 +127,6 @@ class RequestTracker:
             **engine_add_request_kwargs
         }))
         
-        tid = TRACER.add(CTrace.Request)
-        request_trace = TRACER.get(tid)
-        request_trace.start_us = time.perf_counter() * 1e6
-        rid_tid_map[request_id] = tid
         
         self.new_requests_event.set()
 
@@ -149,9 +144,6 @@ class RequestTracker:
             # The request has already finished or been aborted.
             return
 
-        tid = rid_tid_map[request_id]
-        request_trace = TRACER.get(tid)
-        request_trace.end_us = time.perf_counter() * 1e6
         self._request_streams[request_id].finish()
 
     def get_new_and_finished_requests(self) -> Tuple[List[Dict], Set[str]]:
@@ -219,6 +211,7 @@ class _AsyncLLMEngine(LLMEngine):
             blocks_to_swap_in=scheduler_outputs.blocks_to_swap_in,
             blocks_to_swap_out=scheduler_outputs.blocks_to_swap_out,
             blocks_to_copy=scheduler_outputs.blocks_to_copy,
+            tid=None
         )
 
         step_trace.batch_end_us = time.perf_counter() * 1e6
@@ -227,12 +220,6 @@ class _AsyncLLMEngine(LLMEngine):
         outputs = self._process_model_outputs(output, scheduler_outputs) + ignored
 
         step_trace.end_us = time.perf_counter() * 1e6
-        
-        for output in outputs:
-            if output.finished:
-                tid = rid_tid_map[output.request_id]
-                request_trace = TRACER.get(tid)
-                request_trace.end_us = time.perf_counter() * 1e6
         
         return outputs
     

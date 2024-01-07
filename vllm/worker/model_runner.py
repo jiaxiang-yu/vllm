@@ -20,6 +20,9 @@ _PAD_SLOT_ID = -1
 _BATCH_SIZES_TO_CAPTURE = [1, 2, 4] + [8 * i for i in range(1, 33)]
 
 
+from cllam.trace import TRACER
+import cllam.trace as CTrace
+
 class ModelRunner:
 
     def __init__(
@@ -323,7 +326,13 @@ class ModelRunner:
         self,
         seq_group_metadata_list: List[SequenceGroupMetadata],
         kv_caches: List[Tuple[torch.Tensor, torch.Tensor]],
+        tid: str = None
     ) -> SamplerOutput:
+        if tid:
+            step_trace = TRACER.get(tid)
+            torch.cuda.synchronize()
+            prepare_start = time.perf_counter() * 1e6
+            
         # NOTE: We assume that all sequences in the group are all prompts or
         # all decodes.
         is_prompt = seq_group_metadata_list[0].is_prompt
@@ -336,7 +345,13 @@ class ModelRunner:
             input_tokens, input_positions, input_metadata = inputs
         sampling_metadata = self._prepare_sample(seq_group_metadata_list,
                                                  input_metadata.prompt_lens)
-
+        if tid:
+            torch.cuda.synchronize()
+            step_trace.prepare_duration = time.perf_counter() * 1e6 - prepare_start
+            
+            step_trace.use_cuda_graph = input_metadata.use_cuda_graph
+            execute_model_start = time.perf_counter() * 1e6
+            
         # Execute the model.
         if input_metadata.use_cuda_graph:
             graph_batch_size = input_tokens.shape[0]
@@ -349,12 +364,19 @@ class ModelRunner:
             kv_caches=kv_caches,
             input_metadata=input_metadata,
         )
+        if tid:
+            torch.cuda.synchronize()
+            step_trace.execute_model_duration = time.perf_counter() * 1e6 - execute_model_start
 
+            sample_start = time.perf_counter() * 1e6
         # Sample the next token.
         output = self.model.sample(
             hidden_states=hidden_states,
             sampling_metadata=sampling_metadata,
         )
+        if tid:
+            torch.cuda.synchronize()
+            step_trace.sample_duration = time.perf_counter() * 1e6 - sample_start
         return output
 
     @torch.inference_mode()

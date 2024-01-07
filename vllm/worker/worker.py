@@ -132,6 +132,7 @@ class Worker:
         blocks_to_swap_in: Dict[int, int],
         blocks_to_swap_out: Dict[int, int],
         blocks_to_copy: Dict[int, List[int]],
+        tid: str = None
     ) -> SamplerOutput:
         # Issue cache operations.
         issued_cache_op = False
@@ -157,7 +158,7 @@ class Worker:
             return {}
 
         output = self.model_runner.execute_model(seq_group_metadata_list,
-                                                 self.gpu_cache)
+                                                 self.gpu_cache, tid)
         return output
 
 
