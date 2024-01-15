@@ -106,7 +106,7 @@ class BenchEngine:
             raise NotImplementedError(f"{backend}")
 
     def bench(self, runs : List[BenchSetting]) -> List[BenchResult]:
-        time.sleep(20)
+        time.sleep(240)
         print("============Start Benchmarking==================")
         return [self.bench_single(run) for run in runs]
 
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--gen_len", type=int, default=64)
     parser.add_argument("--num_requests", type=int, default=500)
     parser.add_argument("--repeat_num", type=int, default=3)
-    
+
     def tuple_type(strings):
         return tuple([float(a) for a in strings.split(',')])
 
