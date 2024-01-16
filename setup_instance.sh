@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# install git-lfs
-
 # install miniconda if not already installed
 install_miniconda_if_not_exists() {
     if ! [ -x "$(command -v conda)" ]; then
