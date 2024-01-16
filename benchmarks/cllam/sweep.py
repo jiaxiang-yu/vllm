@@ -106,7 +106,7 @@ class BenchEngine:
             raise NotImplementedError(f"{backend}")
 
     def bench(self, runs : List[BenchSetting]) -> List[BenchResult]:
-        time.sleep(240)
+        time.sleep(180)
         print("============Start Benchmarking==================")
         return [self.bench_single(run) for run in runs]
 
