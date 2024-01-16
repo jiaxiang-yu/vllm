@@ -175,11 +175,12 @@ def dump_latency_per_token(mean_latency_per_prompt_token, mean_latency_per_gen_t
     with open(f"data/latency_per_token-{prompt_len}-{gen_len}.json", "w") as f:
         json.dump(data, f, indent=4)
 
-def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_len, num_requests, repeat_num, request_rate_params):
+def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_len, num_requests, repeat_num, request_rate_params, tensor_parallel_size):
     device = torch.cuda.get_device_name(0)
     request_rate_start, request_rate_end, step = request_rate_params
 
-    for tp in [1]:
+    # assume only onr tensor parallel size for now
+    for tp in [tensor_parallel_size]:
         runs = []
         # warmup
         runs.append(BenchSetting(model, tokenizer, device, backend, dataset, 50.0, tp, -1, gen_len, prompt_len, 100))
@@ -216,5 +217,6 @@ if __name__ == "__main__":
         return tuple([float(a) for a in strings.split(',')])
 
     parser.add_argument("--request_rate_params", type=tuple_type, help="start_request_rate, end_request_rate, step_size. End_request_size is INCLUDED.", default='2,50,8')
+    parser.add_argument("--tensor_parallel_size", type=int, default=1)
     args = parser.parse_args()
-    main(args.vllm_dir, args.model, args.tokenizer, args.backend, args.dataset, args.outfile, args.prompt_len, args.gen_len, args.num_requests, args.repeat_num, args.request_rate_params)
+    main(args.vllm_dir, args.model, args.tokenizer, args.backend, args.dataset, args.outfile, args.prompt_len, args.gen_len, args.num_requests, args.repeat_num, args.request_rate_params, args.tensor_parallel_size)
