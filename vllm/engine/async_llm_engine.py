@@ -126,8 +126,8 @@ class RequestTracker:
             "request_id": request_id,
             **engine_add_request_kwargs
         }))
-        
-        
+
+
         self.new_requests_event.set()
 
         return stream
@@ -189,8 +189,8 @@ class _AsyncLLMEngine(LLMEngine):
         step_tid = TRACER.add(CTrace.Step)
         step_trace = TRACER.get(step_tid)
         step_trace.start_us = time.perf_counter() * 1e6
-        
-        
+
+
         seq_group_metadata_list, scheduler_outputs, ignored = self._schedule()
         if scheduler_outputs.is_empty():
             step_trace.end_us = time.perf_counter() * 1e6
@@ -203,7 +203,7 @@ class _AsyncLLMEngine(LLMEngine):
         step_trace.batched_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.scheduled_seq_groups]
         step_trace.preempted_requests = [rid_tid_map[r.request_id] for r in scheduler_outputs.preempted_requests]
         step_trace.available_slots = self.scheduler.block_manager.gpu_allocator.get_num_free_blocks() * self.cache_config.block_size
-        
+
         # Execute the model.
         output = await self._run_workers_async(
             "execute_model",
@@ -220,9 +220,9 @@ class _AsyncLLMEngine(LLMEngine):
         outputs = self._process_model_outputs(output, scheduler_outputs) + ignored
 
         step_trace.end_us = time.perf_counter() * 1e6
-        
+
         return outputs
-    
+
     async def _run_workers_async(
         self,
         method: str,
@@ -506,9 +506,11 @@ class AsyncLLMEngine:
         else:
             return self.engine.get_model_config()
 
-    async def dump(self, filename) -> None:
-        request_rate = float(filename.split('_')[1])
-        TRACER.metadata['request_rate'] = request_rate
+    async def dump(self, filename: str) -> None:
+        assert len(filename.split('_')) >= 4, "filename must be in the format of step_[request_rate]_[prompt_len]_[gen_len]"
+        TRACER.metadata['request_rate'] = float(filename.split('_')[1])
+        TRACER.metadata['prompt_len'] = int(filename.split('_')[2])
+        TRACER.metadata['gen_len'] = int(filename.split('_')[3])
         TRACER.export(filename)
 
     @classmethod
