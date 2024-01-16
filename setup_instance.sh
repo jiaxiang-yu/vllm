@@ -58,9 +58,7 @@ download_data_and_models() {
 install_vllm() {
     install_miniconda_if_not_exists
 
-    cd ~
-    git clone https://github.com/jiaxiang-yu/vllm.git
-    cd vllm
+    cd ~/vllm
 
     git checkout 0.2.6-bench
     conda create -n vllm_0.2.6 python=3.9
@@ -85,6 +83,14 @@ test_run() {
             --repeat_num 1 \
             --request_rate_params 32,32,1 \
             --num_requests 100
+}
+
+setup() {
+    download_data_and_models
+    install_vllm
+    test_run
+
+    echo "Setup complete"
 }
 
 # invoke each function
