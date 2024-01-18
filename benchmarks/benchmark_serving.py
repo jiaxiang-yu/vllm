@@ -89,8 +89,11 @@ async def get_request(
         if request_rate == float("inf"):
             # If the request rate is infinity, then we don't need to wait.
             continue
-        # Sample the request interval from the exponential distribution.
-        interval = np.random.exponential(1.0 / request_rate)
+        # # Sample the request interval from the exponential distribution.
+        # interval = np.random.exponential(1.0 / request_rate)
+
+        # Constant request rate.
+        interval = 1.0 / request_rate
         # The next request will be sent after the interval.
         await asyncio.sleep(interval)
 
@@ -108,7 +111,7 @@ async def dump_trace(api_url:str, filename: str):
         output = b"".join(chunks).decode("utf-8")
         output = json.loads(output)
     print(output)
-        
+
 async def send_request(
     backend: str,
     api_url: str,
@@ -119,7 +122,7 @@ async def send_request(
     use_beam_search: bool,
 ) -> None:
     request_start_time = time.perf_counter()
-    
+
     headers = {"User-Agent": "Benchmark Client"}
     if backend == "vllm":
         pload = {
