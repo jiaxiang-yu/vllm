@@ -183,7 +183,7 @@ def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_
     for tp in [tensor_parallel_size]:
         runs = []
         # warmup
-        runs.append(BenchSetting(model, tokenizer, device, backend, dataset, 50.0, tp, -1, gen_len, prompt_len, 100))
+        runs.append(BenchSetting(model, tokenizer, device, backend, dataset, 1.5, tp, -1, gen_len, prompt_len, 100))
         request_rates = []
         for iteration_num in range(repeat_num):
             # All * 10 to generate non-integer request rates
