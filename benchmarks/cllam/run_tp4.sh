@@ -1,30 +1,30 @@
-# start=$(date +%s.%N)
-# python benchmarks/cllam/sweep.py --model ~/data/models/vicuna-7b-v1.3/ \
-#         --tokenizer ~/data/models/vicuna-7b-v1.3/ \
-#         --dataset ~/data/ShareGPT_V3_unfiltered_cleaned_split.json \
-#         --vllm_dir ~/vllm \
-#         --prompt_len 64 \
-#         --gen_len 256 \
-#         --repeat_num 1 \
-#         --request_rate_params 1,32,1 \
-#         --num_requests 1000 \
-#         --tensor_parallel_size 4
-# end=$(date +%s.%N)
-# runtime=$(python -c "print(${end} - ${start})")
+start=$(date +%s.%N)
+python benchmarks/cllam/sweep.py --model ~/data/models/vicuna-7b-v1.3/ \
+        --tokenizer ~/data/models/vicuna-7b-v1.3/ \
+        --dataset ~/data/ShareGPT_V3_unfiltered_cleaned_split.json \
+        --vllm_dir ~/vllm \
+        --prompt_len 64 \
+        --gen_len 256 \
+        --repeat_num 1 \
+        --request_rate_params 1,32,1 \
+        --num_requests 1000 \
+        --tensor_parallel_size 4
+end=$(date +%s.%N)
+runtime=$(python -c "print(${end} - ${start})")
 
-# mv ~/vllm/cllam/trace ~/vllm/cllam/64-256
-# mv ~/vllm/data/* ~/vllm/cllam/64-256
-# echo "Runtime: $runtime sec" >> ~/vllm/cllam/64-256/done
-# echo "python benchmarks/cllam/sweep.py --model ~/data/models/vicuna-7b-v1.3/ \
-#         --tokenizer ~/data/models/vicuna-7b-v1.3/ \
-#         --dataset ~/data/ShareGPT_V3_unfiltered_cleaned_split.json \
-#         --vllm_dir ~/vllm \
-#         --prompt_len 64 \
-#         --gen_len 256 \
-#         --repeat_num 1 \
-#         --request_rate_params 1,32,1 \
-#         --num_requests 1000 \
-#         --tensor_parallel_size 4" >> ~/vllm/cllam/64-256/done
+mv ~/vllm/cllam/trace ~/vllm/cllam/64-256
+mv ~/vllm/data/* ~/vllm/cllam/64-256
+echo "Runtime: $runtime sec" >> ~/vllm/cllam/64-256/done
+echo "python benchmarks/cllam/sweep.py --model ~/data/models/vicuna-7b-v1.3/ \
+        --tokenizer ~/data/models/vicuna-7b-v1.3/ \
+        --dataset ~/data/ShareGPT_V3_unfiltered_cleaned_split.json \
+        --vllm_dir ~/vllm \
+        --prompt_len 64 \
+        --gen_len 256 \
+        --repeat_num 1 \
+        --request_rate_params 1,32,1 \
+        --num_requests 1000 \
+        --tensor_parallel_size 4" >> ~/vllm/cllam/64-256/done
 
 
 # start=$(date +%s.%N)

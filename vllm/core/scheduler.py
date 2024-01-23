@@ -92,7 +92,7 @@ class Scheduler:
         request_trace = TRACER.get(tid)
         request_trace.start_us = time.perf_counter() * 1e6
         rid_tid_map[seq_group.request_id] = tid
-        
+
         # Add sequence groups to the waiting queue.
         self.waiting.append(seq_group)
 
@@ -367,17 +367,18 @@ class Scheduler:
         # over sequence groups with a single sequence.
         # TODO(woosuk): Support recomputation for sequence groups with multiple
         # sequences. This may require a more sophisticated CUDA kernel.
-        if preemption_mode is None:
-            if seq_group.get_max_num_running_seqs() == 1:
-                preemption_mode = PreemptionMode.RECOMPUTE
-            else:
-                preemption_mode = PreemptionMode.SWAP
-        if preemption_mode == PreemptionMode.RECOMPUTE:
-            self._preempt_by_recompute(seq_group)
-        elif preemption_mode == PreemptionMode.SWAP:
-            self._preempt_by_swap(seq_group, blocks_to_swap_out)
-        else:
-            raise AssertionError("Invalid preemption mode.")
+        # if preemption_mode is None:
+        #     if seq_group.get_max_num_running_seqs() == 1:
+        #         preemption_mode = PreemptionMode.RECOMPUTE
+        #     else:
+        #         preemption_mode = PreemptionMode.SWAP
+        # if preemption_mode == PreemptionMode.RECOMPUTE:
+        #     self._preempt_by_recompute(seq_group)
+        # elif preemption_mode == PreemptionMode.SWAP:
+        #     self._preempt_by_swap(seq_group, blocks_to_swap_out)
+        # else:
+        #     raise AssertionError("Invalid preemption mode.")
+        raise AssertionError("Preemption disabled!")
 
     def _preempt_by_recompute(
         self,
