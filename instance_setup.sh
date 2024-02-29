@@ -80,3 +80,35 @@ test_run() {
 
 # invoke each function
 "$@"
+
+
+
+# create env
+conda create -n vllm_0.2.6 python=3.9
+conda activate vllm_0.2.6
+# install huggingface-cli
+pip install -U "huggingface_hub[cli]"
+# login
+huggingface-cli login
+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
+
+
+# download data and models
+mkdir data
+cd data
+wget https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json
+
+mkdir models
+cd models
+mkdir llama-2-70b-hf
+huggingface-cli download meta-llama/Llama-2-70b-hf --local-dir llama-2-70b-hf
+
+mkdir llama-2-7b-hf
+huggingface-cli download meta-llama/Llama-2-7b-hf --local-dir llama-2-7b-hf
+
+# install vllm
+cd ~
+git clone https://github.com/jiaxiang-yu/vllm.git
+cd vllm
+git checkout 0.2.6-bench
+pip install -e .
