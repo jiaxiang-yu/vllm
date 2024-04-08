@@ -85,9 +85,10 @@ class BenchEngine:
             cmd = ("python -m vllm.entrypoints.api_server"
                   f" --model {model} --tensor-parallel-size {tp} "
                   f" --tokenizer {tokenizer} --disable-log-requests"
-                  f" --gpu-memory-utilization 0.9"
-                  f" --max-num-batched-tokens 4096"
-                  f" --max-num-seqs 4096")
+                #   f" --gpu-memory-utilization 0.9"
+                #   f" --max-num-batched-tokens 4096"
+                #   f" --max-num-seqs 4096"
+                  )
             self.backend_process = Util.run_cmd(cmd, False)
             self.vllm_dir = vllm_dir
         elif backend == "tgi":

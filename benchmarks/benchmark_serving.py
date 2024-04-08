@@ -89,11 +89,11 @@ async def get_request(
         if request_rate == float("inf"):
             # If the request rate is infinity, then we don't need to wait.
             continue
-        # # Sample the request interval from the exponential distribution.
-        # interval = np.random.exponential(1.0 / request_rate)
+        # Sample the request interval from the exponential distribution.
+        interval = np.random.exponential(1.0 / request_rate)
 
-        # Constant request rate.
-        interval = 1.0 / request_rate
+        # # Constant request rate.
+        # interval = 1.0 / request_rate
         # The next request will be sent after the interval.
         await asyncio.sleep(interval)
 
