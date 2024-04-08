@@ -90,7 +90,7 @@ conda activate vllm_0.2.6
 pip install -U "huggingface_hub[cli]"
 # login
 huggingface-cli login
-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
+# enter huggingface-cli login token
 
 
 # download data and models
