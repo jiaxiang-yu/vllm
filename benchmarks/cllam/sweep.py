@@ -78,7 +78,7 @@ class Util:
             return subprocess.Popen(cmd, shell=True, preexec_fn=set_new_pgroup)
 
 class BenchEngine:
-    def __init__(self, backend, model, tokenizer, tp, vllm_dir) -> None:
+    def __init__(self, backend, model, tokenizer, tp, vllm_dir, max_num_seqs) -> None:
         self.backend_process: subprocess.Popen = None
         # launch backend
         if backend == "vllm":
@@ -87,22 +87,10 @@ class BenchEngine:
                   f" --tokenizer {tokenizer} --disable-log-requests"
                 #   f" --gpu-memory-utilization 0.9"
                 #   f" --max-num-batched-tokens 4096"
-                #   f" --max-num-seqs 4096"
+                  f" --max-num-seqs {max_num_seqs}"
                   )
             self.backend_process = Util.run_cmd(cmd, False)
             self.vllm_dir = vllm_dir
-        elif backend == "tgi":
-            cmd = ("docker run --gpus all --shm-size 1g -p 8000:80 "
-                "-v $PWD/data:/data "
-                "ghcr.io/huggingface/text-generation-inference:0.9 "
-                "--model-id lmsys/vicuna-13b-v1.3 "
-                f"--num-shard {tp}  "
-                "--max-input-length 4096 "
-                "--max-total-tokens 4098 "
-                "--max-best-of 5 "
-                "--max-concurrent-requests 5000 "
-                "--max-batch-total-tokens 4098")
-            self.backend_process = Util.run_cmd(cmd, False)
         else:
             raise NotImplementedError(f"{backend}")
 
@@ -176,7 +164,7 @@ def dump_latency_per_token(mean_latency_per_prompt_token, mean_latency_per_gen_t
     with open(f"data/latency_per_token-{prompt_len}-{gen_len}.json", "w") as f:
         json.dump(data, f, indent=4)
 
-def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_len, num_requests, repeat_num, request_rate_params, tensor_parallel_size):
+def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_len, num_requests, repeat_num, request_rate_params, tensor_parallel_size, max_num_seqs):
     device = torch.cuda.get_device_name(0)
     request_rate_start, request_rate_end, step = request_rate_params
 
@@ -192,7 +180,7 @@ def main(vllm_dir, model, tokenizer, backend, dataset, outfile, prompt_len, gen_
                 req_rate = req_rate / 10.0
                 request_rates.append(req_rate)
                 runs.append(BenchSetting(model, tokenizer, device, backend, dataset, req_rate, tp, iteration_num, gen_len, prompt_len, num_requests))
-        engine = BenchEngine(backend, model, tokenizer, tp, vllm_dir)
+        engine = BenchEngine(backend, model, tokenizer, tp, vllm_dir, max_num_seqs)
         results = engine.bench(runs)
         engine.dump_results(results, "data/" + outfile + f"_tp{tp}", DumpFormat.CSV)
 
@@ -219,5 +207,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--request_rate_params", type=tuple_type, help="start_request_rate, end_request_rate, step_size. End_request_size is INCLUDED.", default='2,50,8')
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
+    parser.add_argument("--max_num_seqs", type=int, default=256)
     args = parser.parse_args()
-    main(args.vllm_dir, args.model, args.tokenizer, args.backend, args.dataset, args.outfile, args.prompt_len, args.gen_len, args.num_requests, args.repeat_num, args.request_rate_params, args.tensor_parallel_size)
+    main(args.vllm_dir, args.model, args.tokenizer, args.backend, args.dataset, args.outfile, args.prompt_len, args.gen_len, args.num_requests, args.repeat_num, args.request_rate_params, args.tensor_parallel_size, args.max_num_seqs)
